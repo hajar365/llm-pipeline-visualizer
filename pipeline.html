@@ -1,0 +1,80 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+:root{--bg:#07080f;--c:#5ee7ff;--m:#ff5ecb;--a:#ffd166;--t:#e8ecf5;--d:#8a93a8}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font-family:system-ui,sans-serif}
+.flow{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;padding:14px}
+.flow a{padding:8px 14px;border:1px solid #2a3050;border-radius:20px;color:var(--c);text-decoration:none;font-size:13px;animation:p 3s infinite;animation-delay:calc(var(--i)*.4s)}
+@keyframes p{0%,100%{box-shadow:0 0 0 #0000}50%{box-shadow:0 0 14px var(--c)}}
+.card{margin:16px 10px;padding:18px;border:1px solid #1d2340;border-radius:16px;background:linear-gradient(180deg,#0c0f1d,#080a14)}
+h2{margin:0 0 4px;font-size:19px}h2 b{color:var(--c)}p{color:var(--d);margin:0 0 12px;font-size:14px}
+canvas{width:100%;display:block}.row{display:flex;gap:10px;flex-wrap:wrap}
+.tk{text-align:center;opacity:0;animation:in .6s forwards;animation-delay:calc(var(--i)*.12s)}
+@keyframes in{from{opacity:0;transform:translateY(10px)}to{opacity:1}}
+.w{padding:8px 14px;border:1px solid var(--c);border-radius:10px;color:var(--c);font-family:monospace;box-shadow:0 0 10px #5ee7ff33}
+.id{margin-top:8px;color:var(--a);font-family:monospace;font-size:15px;text-shadow:0 0 8px var(--a)}
+button{background:none;border:1px solid var(--a);color:var(--a);padding:8px 16px;border-radius:10px;cursor:pointer;margin-top:10px}
+button:hover{box-shadow:0 0 14px var(--a)}#nxt{margin-top:14px;padding:14px 16px;border:1px solid #2a3050;border-radius:12px;background:#0a0d1b;font-size:17px;line-height:1.5;min-height:70px}#nxt .lbl{color:var(--d);font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}#nxt .f{color:var(--a);text-shadow:0 0 10px var(--a);font-weight:600}.cur{display:inline-block;width:8px;height:18px;background:var(--c);margin-left:2px;vertical-align:text-bottom;animation:bl 1s steps(2) infinite}@keyframes bl{50%{opacity:0}}
+</style></head><body>
+<div class="flow" id="flow"></div>
+<div class="card" id="s1"><h2><b>1.</b> Tokenizer</h2><p>Text is split into small pieces called tokens.</p><div class="row" id="tok"></div></div>
+<div class="card" id="s2"><h2><b>2.</b> Token IDs</h2><p>Each token is looked up in a vocabulary and becomes a number. The model never sees words.</p><div class="row" id="ids"></div></div>
+<div class="card" id="s3"><h2><b>3.</b> Embeddings</h2><p>Each ID becomes a vector of learned numbers (real models use thousands). Cyan = positive, magenta = negative.</p><canvas id="emb"></canvas></div>
+<div class="card" id="s4"><h2><b>4.</b> Multi-head attention</h2><p>Each head scores how much every token looks at the previous ones. Several heads capture different relationships.</p><canvas id="att"></canvas></div>
+<div class="card" id="s5"><h2><b>5.</b> Feed-forward network (MLP)</h2><p>Information flows through layers of neurons that transform each token's representation.</p><canvas id="mlp"></canvas></div>
+<div class="card" id="s6"><h2><b>6.</b> Softmax and sampling</h2><p>Scores become probabilities. One token is picked and appended to the input, then the whole loop runs again and again, one token at a time, until the full answer is written.</p><canvas id="prb"></canvas><div id="nxt"></div><button id="re">↻ Sample again</button></div>
+<!--DATA-->
+<script>
+function demo(){const T=['Are','you','going','to','take','my','job','?'],r=()=>Math.random()*2-1;
+return{tokens:T,ids:[8491,345,1016,284,1011,616,1693,30],emb:T.map(()=>Array.from({length:8},r)),
+attn:[0,1,2,3].map(()=>T.map((_,i)=>{const a=Array.from({length:i+1},()=>Math.exp(Math.random()*3)),s=a.reduce((x,y)=>x+y);return a.map(v=>v/s)})),
+probs:[[' No',.46,", I won't take your job."],[' I',.22,"'m not going to take it."],[' Yes',.14,', maybe a little.'],[' It',.1," depends on the job."],[' Not',.05,' yet.'],[' Well',.03,', that depends.']].map(([t,p,out])=>({t,p,out}))}}
+const D=window.DEMO||demo(),n=D.tokens.length,$=i=>document.getElementById(i);
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;'),sh=s=>s.replace(/ /g,'·');
+const names=['Tokenizer','Token IDs','Embeddings','Attention','MLP','Softmax'];
+$('flow').innerHTML=names.map((s,i)=>`<a href="#s${i+1}" style="--i:${i}">${i+1}. ${s}</a>`).join('<span style="color:#444;align-self:center">→</span>');
+$('tok').innerHTML=D.tokens.map((t,i)=>`<div class=tk style="--i:${i}"><div class=w>${esc(t)}</div></div>`).join('');
+$('ids').innerHTML=D.tokens.map((t,i)=>`<div class=tk style="--i:${i}"><div class=w>${esc(t)}</div><div class=id data-v=${D.ids[i]}>0</div></div>`).join('');
+function mk(id,h){const c=$(id),r=devicePixelRatio||1,w=c.parentElement.clientWidth-36;c.width=w*r;c.height=h*r;c.style.height=h+'px';const x=c.getContext('2d');x.scale(r,r);return{x,w,h}}
+const E=mk('emb',270),A=mk('att',250),M=mk('mlp',280),P=mk('prb',230);
+const col=(v,a=1)=>v>0?`rgba(94,231,255,${Math.abs(v)*a})`:`rgba(255,94,203,${Math.abs(v)*a})`;
+// MLP structure
+const L=[8,14,14,8],edges=[];
+for(let l=0;l<3;l++)for(let i=0;i<L[l];i++)for(let j=0;j<L[l+1];j++)edges.push([l,i,l+1,j]);
+const pulses=Array.from({length:60},()=>({e:edges[Math.random()*edges.length|0],s:.25+Math.random()*.5,p:Math.random()}));
+const np=(l,i)=>[60+l*(M.w-120)/3,30+(i+.5)*(M.h-60)/L[l]];
+// sampling
+let pick=0,t0=0;
+const fullOut=q=>({first:q.t,rest:q.out||''});
+let tw=null;
+function typeOut(){const o=fullOut(D.probs[pick]),txt=o.first+o.rest;clearInterval(tw);let k=0;
+const render=()=>{const a=esc(o.first.slice(0,k)),b=esc(txt.slice(o.first.length,k));
+$('nxt').innerHTML='<div class=lbl>Next output</div><span class=f>'+a+'</span>'+b+'<span class=cur></span>'};
+render();tw=setInterval(()=>{k++;render();if(k>=txt.length)clearInterval(tw)},28)}
+
+function sample(){let r=Math.random()*D.probs.reduce((s,q)=>s+q.p,0),c=0;pick=D.probs.length-1;for(let i=0;i<D.probs.length;i++){c+=D.probs[i].p;if(r<c){pick=i;break}}t0=performance.now();
+typeOut()}
+$('re').onclick=sample;sample();
+function draw(t){
+document.querySelectorAll('.id').forEach(e=>e.textContent=Math.floor(e.dataset.v*Math.min(1,(t%7000)/1500)));
+let{x,w,h}=E;x.clearRect(0,0,w,h);let cw=Math.min(80,w/n);
+for(let i=0;i<n;i++){const ox=(w-n*cw)/2+i*cw+cw/2;
+for(let j=0;j<8;j++){const v=D.emb[i][j]*(.75+.25*Math.sin(t/500+i+j));x.shadowBlur=12;x.shadowColor=col(v);x.fillStyle=col(v);x.fillRect(ox-cw*.35,10+j*26,cw*.7,20)}
+x.shadowBlur=0;x.fillStyle='#8a93a8';x.font='12px monospace';x.textAlign='center';x.fillText(D.tokens[i],ox,250)}
+({x,w,h}=A);x.clearRect(0,0,w,h);const s=Math.min(180,w/4-30),c=s/n,r=Math.floor(t/700)%n;
+for(let k=0;k<4;k++){const ox=w/4*k+(w/4-s)/2;
+for(let i=0;i<n;i++)for(let j=0;j<n;j++){x.fillStyle=j<=i?`rgba(94,231,255,${Math.min(1,D.attn[k][i][j]*2.2)})`:'#10142a';x.fillRect(ox+j*c,20+i*c,c-1,c-1)}
+x.strokeStyle='#ffd166';x.shadowBlur=10;x.shadowColor='#ffd166';x.strokeRect(ox,20+r*c,s,c);x.shadowBlur=0;
+const row=D.attn[k][r],m=row.indexOf(Math.max(...row));
+x.fillStyle='#8a93a8';x.font='12px monospace';x.textAlign='center';x.fillText('Head '+(k+1),ox+s/2,13);
+x.fillStyle='#ffd166';x.fillText(D.tokens[r]+' → '+D.tokens[m],ox+s/2,36+s)}
+({x,w,h}=M);x.clearRect(0,0,w,h);x.lineWidth=.4;x.strokeStyle='#5ee7ff22';
+edges.forEach(e=>{const a=np(e[0],e[1]),b=np(e[2],e[3]);x.beginPath();x.moveTo(...a);x.lineTo(...b);x.stroke()});
+pulses.forEach(q=>{const f=(t/1000*q.s+q.p)%1,a=np(q.e[0],q.e[1]),b=np(q.e[2],q.e[3]);x.shadowBlur=10;x.shadowColor='#ff5ecb';x.fillStyle='#ff5ecb';x.beginPath();x.arc(a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f,2.5,0,7);x.fill()});
+L.forEach((m,l)=>{for(let i=0;i<m;i++){const[px,py]=np(l,i),g=.5+.5*Math.sin(t/400+l*1.3+i);x.shadowBlur=8+10*g;x.shadowColor='#ffd166';x.strokeStyle='#ffd166';x.fillStyle=`rgba(255,209,102,${.15+.6*g})`;x.lineWidth=1.5;x.beginPath();x.arc(px,py,7,0,7);x.fill();x.stroke()}});
+({x,w,h}=P);x.clearRect(0,0,w,h);x.shadowBlur=0;const g=Math.min(1,(performance.now()-t0)/900),ease=1-Math.pow(1-g,3),bh=26;
+D.probs.forEach((q,i)=>{const y=10+i*(bh+8),on=i==pick,bw=Math.max(2,q.p*(w-190)*ease);
+x.fillStyle='#e8ecf5';x.font='14px monospace';x.textAlign='right';x.fillText(sh(q.t),100,y+18);
+x.shadowBlur=on?20:6;x.shadowColor=on?'#ffd166':'#5ee7ff';x.fillStyle=on?'#ffd166':'#5ee7ff';x.fillRect(110,y,bw,bh);
+x.shadowBlur=0;x.textAlign='left';x.fillStyle='#8a93a8';x.fillText((q.p*100*ease).toFixed(1)+'%',118+bw,y+18)});
+requestAnimationFrame(draw)}
+requestAnimationFrame(draw);
+</script></body></html>
